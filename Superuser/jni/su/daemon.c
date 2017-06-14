@@ -585,6 +585,15 @@ int run_daemon() {
         return -1;
     }
 
+    pid_t pid = getpid();
+    int ffd = open("/dev/su_phh_daemon", O_WRONLY | O_CREAT);
+    if (ffd == -1){
+        perror("open");
+        return -1;
+    }
+    write(ffd, &pid, sizeof(pid));
+    close(ffd);
+
 	prepare();
 
     int fd;

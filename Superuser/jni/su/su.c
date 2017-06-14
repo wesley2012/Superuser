@@ -39,6 +39,7 @@
 #include <selinux/selinux.h>
 #include <arpa/inet.h>
 #include <sys/auxv.h>
+#include <libgen.h>
 
 #include "su.h"
 #include "utils.h"
@@ -673,7 +674,42 @@ static void fork_for_samsung(void)
 }
 
 int main(int argc, char *argv[]) {
+    int daemon_running = 0;
+
+    if (getuid() == 0){
+        int fd = open("/dev/su_phh_daemon", O_RDONLY);
+        if (fd != -1){
+
+            pid_t pid;
+            if (sizeof(pid_t) == read(fd, &pid, sizeof(pid_t))){
+
+	        if (kill(pid, 0) == 0){
+		    daemon_running = 1;
+		}
+
+            }
+	    close(fd);
+        }
+    }
+
+    char *exe = argv[0];
+    char *bname = basename(exe);
+    int calling_su = (strcmp(bname, "su") == 0 || strcmp(bname, "su_phh") == 0);
+
+    if (!calling_su){
+    	if (!daemon_running){
+            system("/system/xbin/su_phh --daemon &");
+	}
+        char *orig = malloc(strlen(exe) + sizeof(".orig"));
+        strcpy(orig, exe);
+        strcat(orig, ".orig");
+        return execvp(orig, argv);
+    }
+
     if (argc == 2 && strcmp(argv[1], "--daemon") == 0) {
+        if (daemon_running){
+            return 0;
+        }
         //Everything we'll exec will be in su, not su_daemon
 		setexeccon("u:r:su:s0");
         return run_daemon();
